@@ -1,0 +1,111 @@
+---
+title: "615 strawberry"
+output: html_document
+date: "2024-10-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+library(knitr)  
+library(kableExtra)
+library(stringr)
+strawberry<-read.csv("strawberries25_v3.csv")
+glimpse(strawberry)
+```
+
+```{r}
+sum(strawberry$Domain == "TOTAL")
+sum(strawberry$Domain == "TOTAL")
+state_all <- strawberry |> distinct(State)
+state_all1 <- strawberry |> group_by(State) |> count()
+```
+
+##Step 2: Remove columns containing only a single value.
+##The rationale behind this step is that these columns display the same value across all entries and thus provide no unique insights for data analysis, modeling, or forecasting efforts. Such columns fail to offer any differentiation among observations.
+```{r}
+drop1<- function(df){
+drop <- NULL
+for(i in 1:dim(df)[2]){
+if((df |> distinct(df[,i]) |> count()) == 1){
+drop = c(drop, i)
+} }
+
+if(is.null(drop)){return("none")}else{
+
+   print("Columns dropped:")
+   print(colnames(df)[drop])
+   strawberry <- df[, -1*drop]
+   }
+}
+strawberry <- drop1(strawberry)
+drop1(strawberry)
+```
+###Step 3: Analyze the data sources to gain a deeper understanding of the data.
+```{r}
+calif <- strawberry |> filter(State=="CALIFORNIA")
+unique(calif$Program)
+```
+
+```{r}
+calif_census <- calif |> filter(Program=="CENSUS")
+calif_survey  <- calif |>  filter(Program=="SURVEY")
+```
+**The comparison reveals that the following variables in the survey data contain NA values: "Ag.District", "Ag.District.Code", "Country", "Country.ANSI", "CV...". This discrepancy may stem from the nature of surveys, which typically involve more frequent but smaller-scale data collection, as opposed to censuses that are conducted less frequently but encompass a broader data scope, resulting in more exhaustive datasets.**
+
+## Step 4: Organize column variables.
+## The data consolidated under the same column (Data.Item) requires segmentation into separate columns, and the introduction of new variables is necessary.
+```{r}
+strawberry <- strawberry |>
+  separate(
+    col = `Data.Item`,           
+    into = c("Fruit", "Rest"),   
+    sep = " - ",                 
+    remove = FALSE,              
+    extra = "merge",             
+    fill = "right"               
+  )
+
+# Step 2: split 'Rest' into 'Measure' and 'Bearing_type'
+strawberry <- strawberry |>
+  separate(
+    col = Rest,
+    into = c("Measure", "Bearing_type"),  
+    sep = "(?=(ACRES|WITH))",   
+    remove = FALSE,                     
+    extra = "merge",                      
+    fill = "left"          
+  ) |>
+  select(-Rest, -Fruit, -Data.Item) 
+```
+
+### Step 5: Convert any exceptional characters in 'VALUE' to NA.
+```{r}
+footnotes_v <- strawberry %>%
+   filter(!is.na(Value) & !grepl("^[0-9]+(\\.[0-9]+)?(,[0-9]{1,3})*$", Value)) %>%  
+  distinct(Value)
+strawberry <- strawberry %>% mutate(Value = na_if(Value, "(NA)"))
+strawberry$Value<-as.numeric(str_replace(strawberry$Value,",",""))
+```
+
+```{r}
+write.csv(strawberry, file = "cleaned_strawberry_data.csv", row.names = FALSE)
+```
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
